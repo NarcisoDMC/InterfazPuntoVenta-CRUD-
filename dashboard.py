@@ -1,7 +1,7 @@
 import conexion_db as db
 import tkinter as tk
 from tkinter import ttk, messagebox
-import pyodbc # Necesario para manejar los errores de la transacción
+import pyodbc 
 
 class Dashboard:
     def __init__(self, root):
@@ -10,23 +10,15 @@ class Dashboard:
         self.root.title("Gestor de Supermercado")
         self.center_window()
 
-        # --- NUEVO ---
-        # Variable para almacenar los productos del carrito actual
         self.carrito = [] 
-        
-        # --- CORREGIDO ---
-        # Variable para el total (numérico)
         self.total_venta = tk.DoubleVar(value=0.0) 
-        # Variable para el total (display)
-        self.total_display = tk.StringVar(value="Total: $0.00") # <-- NUEVO
+        self.total_display = tk.StringVar(value="Total: $0.00") 
 
         # LETRA ESTILO
         style = ttk.Style()
         style.configure("GrandeDerecha.TLabel", font=("Arial", 16))
         style.configure("Total.TLabel", font=("Arial", 14, "bold"), foreground="blue")
 
-        # --- MODIFICADO ---
-        # Obtenemos el *siguiente* folio a usar
         folio_a_mostrar = obtener_siguiente_folio()
         self.folio_dinamico = tk.StringVar()
         self.folio_dinamico.set(f"Siguiente Folio: {folio_a_mostrar}")
@@ -50,40 +42,33 @@ class Dashboard:
         self.entry_cantidad = ttk.Entry(form_frame, textvariable=self.cantidad, width=15)
         self.entry_cantidad.grid(row=0, column=3, padx=5, pady=5)
         
-        # Botón para agregar al carrito
         self.btn_agregar = ttk.Button(form_frame, text="Agregar al Carrito", command=self.agregar_al_carrito)
         self.btn_agregar.grid(row=0, column=4, padx=10, pady=5)
         
-        # Enfocar el primer campo
         self.entry_producto.focus()
-        # Bind <Return> para pasar al siguiente campo y luego agregar
         self.entry_producto.bind('<Return>', lambda e: self.entry_cantidad.focus())
         self.entry_cantidad.bind('<Return>', lambda e: self.agregar_al_carrito())
 
 
-        # TABLA (Ahora es el Carrito)
+        # TABLA (Carrito)
         tree_frame = ttk.Frame(root)
         tree_frame.pack(padx=10, pady=10, fill="both", expand=True) 
         
-        # - IDENTIFICADORES INTERNOS
         column_ids = ("claveProducto","descProd", "cantidad", "precio_unit", "subtotal") 
         self.tree = ttk.Treeview(tree_frame, columns=column_ids, show="headings")
         
-        # - CONFIGURACION DE ENCABEZADOS
         self.tree.heading("claveProducto", text="Clave")
         self.tree.heading("descProd", text="Producto")
         self.tree.heading("cantidad", text="Cantidad")
         self.tree.heading("precio_unit", text="Precio Unit.")
         self.tree.heading("subtotal", text="Subtotal") 
         
-        # - CONFIGURACION DE COLUMNAS
         self.tree.column("claveProducto", width=50, anchor=tk.CENTER)
         self.tree.column("descProd", width=200)
         self.tree.column("cantidad", width=80, anchor=tk.CENTER)
         self.tree.column("precio_unit", width=100, anchor=tk.E)
         self.tree.column("subtotal", width=100, anchor=tk.E) 
         
-        # - SCROLLBAR
         scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -93,20 +78,23 @@ class Dashboard:
         total_frame = ttk.Frame(root)
         total_frame.pack(fill="x", padx=10, pady=10)
         
-        # --- CORREGIDO ---
-        # La etiqueta ahora usa la variable de display (StringVar)
         self.lbl_total = ttk.Label(total_frame, textvariable=self.total_display, style="Total.TLabel")
         self.lbl_total.pack(side=tk.LEFT, padx=10)
 
+        # Botones de acción (empaquetados de derecha a izquierda)
+        self.btn_registrar = ttk.Button(total_frame, text="Registrar Venta", command=self.realizar_venta)
+        self.btn_registrar.pack(side=tk.RIGHT, padx=5)
+        
+        # Boton para cancelar venta
         self.btn_cancelar = ttk.Button(total_frame, text="Cancelar Venta", command=self.limpiar_venta)
         self.btn_cancelar.pack(side=tk.RIGHT, padx=5)
 
-        self.btn_registrar = ttk.Button(total_frame, text="Registrar Venta", command=self.realizar_venta)
-        self.btn_registrar.pack(side=tk.RIGHT, padx=5)
+        # Boton para quitar producto
+        self.btn_quitar = ttk.Button(total_frame, text="Quitar Producto", command=self.eliminar_del_carrito)
+        self.btn_quitar.pack(side=tk.RIGHT, padx=5)
 
 
     def agregar_al_carrito(self):
-        # 1. Obtener y validar datos de entrada
         try:
             clave = int(self.producto_clave.get())
             cantidad = int(self.cantidad.get())
@@ -117,7 +105,6 @@ class Dashboard:
             messagebox.showwarning("Dato Inválido", "La clave y la cantidad deben ser números.")
             return
 
-        # 2. Obtener datos del producto de la BD
         producto_info = obtener_producto_por_clave(clave)
         if not producto_info:
             messagebox.showerror("No Encontrado", f"El producto con clave {clave} no existe.")
@@ -125,15 +112,10 @@ class Dashboard:
 
         desc, precio, stock = producto_info
 
-        # 3. Validar stock
         if cantidad > stock:
             messagebox.showwarning("Stock Insuficiente", f"Solo quedan {stock} unidades de '{desc}'.")
             return
             
-        # 4. (Opcional) Verificar si el producto ya está en el carrito y sumarlo
-        # ... (por simplicidad, permitimos duplicados por ahora)
-
-        # 5. Agregar al carrito y actualizar UI
         subtotal = cantidad * precio
         item_carrito = (clave, desc, cantidad, precio, subtotal)
         
@@ -141,19 +123,15 @@ class Dashboard:
         self.actualizar_treeview_carrito()
         self.actualizar_total()
 
-        # 6. Limpiar campos y re-enfocar
         self.producto_clave.set("")
         self.cantidad.set("")
         self.entry_producto.focus()
 
     def actualizar_treeview_carrito(self):
-        # Limpiar la tabla
         for item in self.tree.get_children():
             self.tree.delete(item)
         
-        # Llenar la tabla con el carrito actual
         for item in self.carrito:
-            # Formateamos precios para la vista
             item_formateado = (
                 item[0], 
                 item[1], 
@@ -163,11 +141,10 @@ class Dashboard:
             )
             self.tree.insert("", tk.END, values=item_formateado) 
 
-    # --- CORREGIDO ---
     def actualizar_total(self):
         total = sum(item[4] for item in self.carrito) # Suma los subtotales
-        self.total_venta.set(total) # Guarda el valor numérico
-        self.total_display.set(f"Total: ${total:.2f}") # Guarda el string formateado para la UI
+        self.total_venta.set(total) 
+        self.total_display.set(f"Total: ${total:.2f}") 
 
     def limpiar_venta(self):
         if not self.carrito:
@@ -178,20 +155,45 @@ class Dashboard:
             self.actualizar_treeview_carrito()
             self.actualizar_total()
             
-            # Actualizamos el folio por si acaso alguien más registró una venta
             nuevo_folio = obtener_siguiente_folio()
             self.folio_dinamico.set(f"Siguiente Folio: {nuevo_folio}")
             
             self.entry_producto.focus()
             
+    # --- FUNCIÓN PARA ELIMINAR UN PRODUCTO DEL CARRITO ---
+    def eliminar_del_carrito(self):
+        """
+        Quita el producto seleccionado en el Treeview del carrito.
+        """
+        # 1. Obtener el item seleccionado (esto da un ID interno de tkinter, ej: 'I001')
+        selected_item_id = self.tree.focus() 
+
+        if not selected_item_id:
+            messagebox.showwarning("Nada Seleccionado", "Por favor, selecciona un producto de la lista para quitarlo.")
+            return
+
+        # 2. Obtener el índice numérico (0, 1, 2...) de ese item
+        try:
+            item_index = self.tree.index(selected_item_id)
+        
+            # 3. Eliminar ese item de la lista de *datos* (self.carrito)
+            self.carrito.pop(item_index)
+        
+            # 4. Actualizar la vista (Treeview)
+            self.actualizar_treeview_carrito()
+            
+            # 5. Actualizar el total
+            self.actualizar_total()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo quitar el item: {e}")
+
+    #Función para registrar la venta en la base de datos con manejo de transacciones
     def realizar_venta(self):
-        # Validar que haya items
         if not self.carrito:
             messagebox.showwarning("Carrito Vacío", "Agregue al menos un producto para registrar la venta.")
             return
 
-        # --- CORREGIDO ---
-        # Ahora usamos la variable de display (StringVar) que contiene el texto formateado
         if not messagebox.askyesno("Confirmar Venta", f"¿Desea registrar esta venta?\n{self.total_display.get()}"):
             return
             
@@ -215,9 +217,6 @@ class Dashboard:
                 raise Exception(f"No se encontró la sucursal {id_sucursal_actual}")
             
             nuevo_folio = resultado_folio[0]
-            
-            # --- CORREGIDO ---
-            # Obtenemos el total numérico directamente desde la DoubleVar
             total_calculado = self.total_venta.get() 
 
             # 2. Registrar el encabezado de la Venta
@@ -241,9 +240,7 @@ class Dashboard:
             conn.commit() # --- COMMIT DE LA TRANSACCIÓN ---
             
             messagebox.showinfo("Éxito", f"Venta {nuevo_folio} registrada correctamente.")
-            self.limpiar_venta() # Limpia el carrito para la siguiente venta
-            
-            # Actualiza el label del folio
+            self.limpiar_venta() 
             self.folio_dinamico.set(f"Siguiente Folio: {nuevo_folio + 1}")
 
         except pyodbc.Error as ex:
@@ -280,10 +277,7 @@ class Dashboard:
         
         self.root.geometry(f'{window_width}x{window_height}+{center_x}+{center_y}')   
 
-# --- Ya no se usa ---
-# def obtener_detalle_venta():
-#     ...
-
+# Función para obtener el siguiente folio de venta
 def obtener_siguiente_folio():
     conn = db.get_connection()
     siguiente_folio = 1 
@@ -302,17 +296,15 @@ def obtener_siguiente_folio():
             
     return siguiente_folio
 
+# Función para obtener información del producto por su clave
 def obtener_producto_por_clave(clave):
-    """
-    Obtiene los datos de un producto para agregarlo al carrito.
-    """
     conn = db.get_connection()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("SELECT descProd, precio, stock FROM Producto WHERE claveProducto = ?", (clave))
             record = cursor.fetchone()
-            return record # Devuelve (desc, precio, stock) o None
+            return record 
         except Exception as e:
             messagebox.showerror("Error de consulta", f"Error al buscar producto: {e}")
         finally:
@@ -321,9 +313,6 @@ def obtener_producto_por_clave(clave):
 
 
 if __name__ == "__main__":
-    # Para probar esta ventana directamente (sin login):
     root = tk.Tk()
     venta = Dashboard(root)
     root.mainloop()
-    
-    # Para probar con el login, ejecuta login.py
