@@ -99,7 +99,7 @@ python login.py
   
 ## 👤 Autores
 
-**Alondra Olvera Martinez**
-**David Alexis De La Torre Rios**
+* **Alondra Olvera Martinez**
+* **David Alexis De La Torre Rios**
 
 Desarrollado como proyecto académico de software para gestión de ventas.
