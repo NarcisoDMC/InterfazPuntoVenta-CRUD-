@@ -97,5 +97,9 @@ python login.py
   dashboard.py      # Lógica principal del punto de venta y UI
   conexion_db.py    # Módulo de conexión y strings de conexión ODBC
   
-## 👤 Autor
+## 👤 Autores
+
+**Alondra Olvera Martinez**
+**David Alexis De La Torre Rios**
+
 Desarrollado como proyecto académico de software para gestión de ventas.
